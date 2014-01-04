@@ -70,10 +70,19 @@
     (with-current-buffer standard-output
       (apply 'vc-git-command (current-buffer) 0 nil args))))
 
+(defun anything-git-files:tramp-prefix (file-name)
+  (if (tramp-tramp-file-p file-name)
+      (let ((local-file-name (tramp-file-name-localname (tramp-dissect-file-name file-name))))
+	(substring file-name 0 (- (length local-file-name))))
+    ""))
+
 (defun anything-git-files:root-1 ()
-  (file-name-as-directory
-   (anything-git-files:chomp
-    (anything-git-files:command-to-string "rev-parse" "--show-toplevel"))))
+  (let ((root
+	 (file-name-as-directory
+	  (anything-git-files:chomp
+	   (anything-git-files:command-to-string "rev-parse" "--show-toplevel"))))
+	(tramp-prefix (anything-git-files:tramp-prefix default-directory)))
+    (concat tramp-prefix root)))
 
 (defun anything-git-files:root ()
   (or (vc-file-getprop default-directory 'git-root)
@@ -84,9 +93,6 @@
   (let ((default-directory (or root default-directory)))
     (anything-git-files:chomp
      (anything-git-files:command-to-string "rev-parse" "HEAD"))))
-
-(defun anything-git-files:ls (buffer &rest args)
-  (apply 'vc-git-command buffer 0 nil "ls-files" args))
 
 (defun anything-git-files:ls-async (buffer callback &rest args)
   (let ((proc (apply 'vc-git-command buffer 'async nil "ls-files" args)))
@@ -174,6 +180,16 @@ is tracked for each KEY separately."
 
 (defun anything-git-files:sentinel (process event)
   (when (equal event "finished\n")
+    (let ((tramp-prefix (anything-git-files:tramp-prefix (anything-attr 'default-directory))))
+      (with-current-buffer (process-buffer process)
+	(beginning-of-buffer)
+	(let (f)
+	  (setq f t)
+	  (while f
+	    (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+	      (unless (= (point) (point-max)) (insert tramp-prefix))
+	      (setq f (= 0 (forward-line 1))))))
+	(end-of-buffer)))
     (anything-git-files:throttled-update)))
 
 (defun anything-git-files:update-1 ()
