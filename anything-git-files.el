@@ -180,7 +180,8 @@ is tracked for each KEY separately."
 
 (defun anything-git-files:sentinel (process event)
   (when (equal event "finished\n")
-    (let ((tramp-prefix (anything-git-files:tramp-prefix (anything-attr 'default-directory))))
+    (let ((tramp-prefix (or anything-git-files:initial-tramp-prefix)
+			 (anything-git-files:tramp-prefix (anything-attr 'default-directory))))
       (with-current-buffer (process-buffer process)
 	(beginning-of-buffer)
 	(let (f)
@@ -218,7 +219,9 @@ is tracked for each KEY separately."
     (anything-git-files:update-1)))
 
 (defun anything-git-files:init ()
-  (anything-attrset 'default-directory (anything-git-files:root)))
+  (let ((root (anything-git-files:root)))
+    (anything-attrset 'default-directory root)
+    (setq anything-git-files:initial-tramp-prefix (anything-git-files:tramp-prefix root))))
 
 (defun anything-git-files:cleanup ()
   (anything-new-timer 'anything-process-delayed-sources-timer nil)
